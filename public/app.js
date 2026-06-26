@@ -1,15 +1,13 @@
 /* ── State ───────────────────────────────────────────────────────────────── */
 let session = null;  // { teamName, password, currentSet, totalScore, scores }
-let sets = [];       // from /api/sets
+let sets = [];
 let leaderboardData = [];
-
-const socket = io();
+let pollTimer = null;
 
 /* ── Boot ────────────────────────────────────────────────────────────────── */
 (async () => {
   const res = await fetch('/api/sets');
   sets = await res.json();
-  renderPips();
 })();
 
 /* ── Screens ─────────────────────────────────────────────────────────────── */
@@ -48,7 +46,6 @@ document.getElementById('login-form').addEventListener('submit', async e => {
       errEl.classList.remove('hidden');
       return;
     }
-
     session = { teamName, password, currentSet: data.currentSet, totalScore: data.totalScore, scores: data.scores };
     enterCompetition();
   } finally {
@@ -62,7 +59,7 @@ function enterCompetition() {
   showScreen('comp-screen');
   document.getElementById('hdr-team').textContent = session.teamName;
   updateHeaderScore();
-  renderPips();
+  startPolling();
 
   if (session.currentSet >= sets.length) {
     showFinished();
@@ -75,15 +72,30 @@ function updateHeaderScore() {
   document.getElementById('hdr-score').textContent = session.totalScore;
 }
 
+/* ── Leaderboard polling ─────────────────────────────────────────────────── */
+async function fetchLeaderboard() {
+  try {
+    const res = await fetch('/api/leaderboard');
+    if (res.ok) {
+      leaderboardData = await res.json();
+      renderLeaderboard();
+    }
+  } catch (_) { /* ignore transient errors */ }
+}
+
+function startPolling() {
+  fetchLeaderboard();
+  if (!pollTimer) pollTimer = setInterval(fetchLeaderboard, 10000);
+}
+
 /* ── Progress pips ───────────────────────────────────────────────────────── */
 function renderPips() {
   const container = document.getElementById('set-progress');
   if (!container || !sets.length) return;
-  const pips = sets.map((_, i) => {
-    const cls = i < (session?.currentSet ?? 0) ? 'done' : i === (session?.currentSet ?? 0) ? 'active' : '';
+  container.innerHTML = '<div class="pips">' + sets.map((_, i) => {
+    const cls = i < session.currentSet ? 'done' : i === session.currentSet ? 'active' : '';
     return `<div class="pip ${cls}"></div>`;
-  }).join('');
-  container.innerHTML = `<div class="pips">${pips}</div>`;
+  }).join('') + '</div>';
 }
 
 /* ── Render set ──────────────────────────────────────────────────────────── */
@@ -91,13 +103,11 @@ function renderSet(idx) {
   const set = sets[idx];
   if (!set) return;
 
-  // Banner
   document.getElementById('set-num').textContent = `Set ${set.number}`;
   document.getElementById('set-meta').textContent =
     `  ·  ${set.points} pts each  ·  ${set.level}`;
   renderPips();
 
-  // Problems
   const list = document.getElementById('problems-list');
   list.innerHTML = set.problems.map((p, i) => `
     <div class="problem-card">
@@ -107,19 +117,15 @@ function renderSet(idx) {
   `).join('');
   renderMath(list);
 
-  // Answer inputs
-  const grid = document.getElementById('answer-grid');
-  grid.innerHTML = [1, 2, 3, 4].map(n => `
+  document.getElementById('answer-grid').innerHTML = [1, 2, 3, 4].map(n => `
     <div class="answer-field">
       <label>Problem ${n}</label>
       <input type="text" id="ans-${n}" placeholder="Answer ${n}" autocomplete="off" />
     </div>
   `).join('');
 
-  // Focus first input
   setTimeout(() => document.getElementById('ans-1')?.focus(), 50);
 
-  document.getElementById('answer-section').querySelector('h3')?.remove();
   document.getElementById('submit-error').classList.add('hidden');
   document.getElementById('result-overlay').classList.add('hidden');
   document.getElementById('finished-overlay').classList.add('hidden');
@@ -164,6 +170,7 @@ async function submitSet() {
     session.currentSet++;
     updateHeaderScore();
     renderPips();
+    fetchLeaderboard(); // immediate refresh after submit
     showResult(data);
   } finally {
     btn.disabled = false;
@@ -173,22 +180,19 @@ async function submitSet() {
 
 /* ── Result overlay ──────────────────────────────────────────────────────── */
 function showResult(data) {
-  const set = sets[session.currentSet - 1];
+  const set     = sets[session.currentSet - 1];
   const correct = data.results.filter(r => r.correct).length;
-  const maxPts  = set.points * 4;
 
   document.getElementById('result-icon').textContent =
     correct === 4 ? '🎉' : correct === 0 ? '😔' : '✅';
   document.getElementById('result-title').textContent =
     correct === 4 ? 'Perfect Set!' : `${correct} / 4 Correct`;
 
-  // Color answer inputs
   data.results.forEach((r, i) => {
     const inp = document.getElementById(`ans-${i + 1}`);
     if (inp) { inp.classList.add(r.correct ? 'correct' : 'wrong'); inp.disabled = true; }
   });
 
-  // Breakdown
   document.getElementById('result-breakdown').innerHTML = data.results.map((r, i) => `
     <div class="rb-item ${r.correct ? 'correct' : 'wrong'}">
       <div class="rb-label">Problem ${i + 1}</div>
@@ -221,13 +225,8 @@ function showFinished() {
 }
 
 /* ── Leaderboard ─────────────────────────────────────────────────────────── */
-socket.on('leaderboard', data => {
-  leaderboardData = data;
-  renderLeaderboard();
-});
-
 function renderLeaderboard() {
-  const list = document.getElementById('lb-list');
+  const list  = document.getElementById('lb-list');
   const count = document.getElementById('lb-count');
   if (!list) return;
 
@@ -239,14 +238,14 @@ function renderLeaderboard() {
   }
 
   list.innerHTML = leaderboardData.map((team, i) => {
-    const rank     = i + 1;
-    const rankCls  = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
-    const rankStr  = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
-    const isMe     = session && team.name === session.teamName;
-    const setsDone = Math.min(team.currentSet - 1, 8);
+    const rank    = i + 1;
+    const rankCls = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+    const rankStr = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+    const isMe    = session && team.name === session.teamName;
+    const done    = Math.min(team.currentSet - 1, 8);
 
     const bars = Array.from({ length: 8 }, (_, si) => {
-      const cls = si < setsDone ? 'done' : si === setsDone && !team.finished ? 'active' : '';
+      const cls = si < done ? 'done' : (si === done && !team.finished ? 'active' : '');
       return `<div class="lb-bar ${cls}"></div>`;
     }).join('');
 
@@ -264,14 +263,14 @@ function renderLeaderboard() {
   }).join('');
 }
 
-/* ── KaTeX rendering ─────────────────────────────────────────────────────── */
+/* ── KaTeX ───────────────────────────────────────────────────────────────── */
 function renderMath(el) {
   renderMathInElement(el, {
     delimiters: [
-      { left: '$$', right: '$$', display: true },
+      { left: '$$', right: '$$', display: true  },
       { left: '$',  right: '$',  display: false },
       { left: '\\(', right: '\\)', display: false },
-      { left: '\\[', right: '\\]', display: true },
+      { left: '\\[', right: '\\]', display: true  },
     ],
     throwOnError: false,
   });
@@ -280,8 +279,6 @@ function renderMath(el) {
 /* ── Util ────────────────────────────────────────────────────────────────── */
 function escHtml(s) {
   return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
