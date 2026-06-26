@@ -77,7 +77,7 @@ app.get('/api/leaderboard', (req, res) => {
 });
 
 app.get('/api/sets', (req, res) => {
-  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
   return res.json(SETS.map(s => ({
     number: s.number, points: s.points, level: s.level, problems: s.problems,
   })));
