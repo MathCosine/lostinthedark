@@ -83,6 +83,53 @@ app.get('/api/sets', (req, res) => {
   })));
 });
 
+// ── Staff / admin ─────────────────────────────────────────────────────────────
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'sfma-staff';
+
+app.post('/api/admin', (req, res) => {
+  const { password, action, teamName } = req.body || {};
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Incorrect staff password.' });
+  }
+
+  switch (action) {
+    case 'list': {
+      const list = Object.values(teams)
+        .map(t => ({
+          name: t.name,
+          totalScore: t.totalScore,
+          currentSet: t.currentSet + 1,
+          scores: t.scores,
+          finished: t.currentSet >= SETS.length,
+        }))
+        .sort((a, b) => b.totalScore - a.totalScore || a.name.localeCompare(b.name));
+      return res.json({ ok: true, teams: list });
+    }
+    case 'reset': {
+      const n = Object.keys(teams).length;
+      for (const t of Object.values(teams)) {
+        t.currentSet = 0;
+        t.scores = Array(8).fill(0);
+        t.totalScore = 0;
+      }
+      return res.json({ ok: true, message: `Reset progress for ${n} team(s).` });
+    }
+    case 'deleteAll': {
+      const n = Object.keys(teams).length;
+      for (const k of Object.keys(teams)) delete teams[k];
+      return res.json({ ok: true, message: `Deleted ${n} team(s).` });
+    }
+    case 'deleteTeam': {
+      const name = (teamName || '').trim();
+      if (!name) return res.status(400).json({ error: 'No team specified.' });
+      delete teams[name];
+      return res.json({ ok: true, message: `Deleted team "${name}".` });
+    }
+    default:
+      return res.status(400).json({ error: 'Unknown action.' });
+  }
+});
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

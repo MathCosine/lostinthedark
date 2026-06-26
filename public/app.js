@@ -112,21 +112,23 @@ function renderSet(idx) {
     `  ·  ${set.points} pts each  ·  ${set.level}`;
   renderPips();
 
-  const list = document.getElementById('problems-list');
-  list.innerHTML = set.problems.map((p, i) => `
-    <div class="problem-card">
-      <div class="prob-num">${i + 1}</div>
-      <div class="prob-text">${p}</div>
-    </div>
-  `).join('');
-  renderMath(list);
-
+  // Answer inputs FIRST, so the competition is usable even if math rendering
+  // ever fails (e.g. KaTeX blocked). The grid must never depend on renderMath.
   document.getElementById('answer-grid').innerHTML = [1, 2, 3, 4].map(n => `
     <div class="answer-field">
       <label>Problem ${n}</label>
       <input type="text" id="ans-${n}" placeholder="Answer ${n}" autocomplete="off" />
     </div>
   `).join('');
+
+  const list = document.getElementById('problems-list');
+  list.innerHTML = set.problems.map((p, i) => `
+    <div class="problem-card">
+      <div class="prob-num">${i + 1}</div>
+      <div class="prob-text">${escHtml(p)}</div>
+    </div>
+  `).join('');
+  renderMath(list);
 
   setTimeout(() => document.getElementById('ans-1')?.focus(), 50);
 
@@ -272,15 +274,20 @@ function renderLeaderboard() {
 
 /* ── KaTeX ───────────────────────────────────────────────────────────────── */
 function renderMath(el) {
-  renderMathInElement(el, {
-    delimiters: [
-      { left: '$$', right: '$$', display: true  },
-      { left: '$',  right: '$',  display: false },
-      { left: '\\(', right: '\\)', display: false },
-      { left: '\\[', right: '\\]', display: true  },
-    ],
-    throwOnError: false,
-  });
+  // Never let a missing/slow KaTeX break the page — the raw $...$ text simply
+  // stays visible and the competition remains fully usable.
+  if (typeof renderMathInElement !== 'function') return;
+  try {
+    renderMathInElement(el, {
+      delimiters: [
+        { left: '$$', right: '$$', display: true  },
+        { left: '$',  right: '$',  display: false },
+        { left: '\\(', right: '\\)', display: false },
+        { left: '\\[', right: '\\]', display: true  },
+      ],
+      throwOnError: false,
+    });
+  } catch (_) { /* leave raw LaTeX visible */ }
 }
 
 /* ── Util ────────────────────────────────────────────────────────────────── */

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SFMA Guts Round · Staff</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23b91c1c'/%3E%3Ctext x='16' y='23' font-size='20' font-family='Georgia,serif' fill='white' text-anchor='middle'%3E%CF%80%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ── STAFF LOGIN ─────────────────────────────────────────────────────────── -->
+<div id="admin-login-screen" class="screen active">
+  <div class="login-card">
+    <div class="login-header">
+      <div class="login-badge badge-staff">STAFF</div>
+      <h1>Control Panel</h1>
+      <p class="login-sub">SFMA Guts Round · Administration</p>
+    </div>
+    <form id="admin-login-form">
+      <label for="admin-password">Staff Password</label>
+      <input id="admin-password" type="password" placeholder="Enter staff password" />
+      <div id="admin-login-error" class="error-msg hidden"></div>
+      <button type="submit" class="btn-primary">Sign In</button>
+    </form>
+    <p class="login-hint"><a href="/" class="plain-link">← Back to competition</a></p>
+  </div>
+</div>
+
+<!-- ── STAFF DASHBOARD ─────────────────────────────────────────────────────── -->
+<div id="admin-screen" class="screen admin-screen">
+  <header class="comp-header">
+    <div class="header-left">
+      <span class="header-logo badge-staff-sm">STAFF</span>
+      <span class="header-title">Control Panel</span>
+    </div>
+    <div class="header-center">
+      <span id="admin-status" class="hdr-team"></span>
+    </div>
+    <div class="header-right">
+      <a href="/" class="header-link">View Competition →</a>
+    </div>
+  </header>
+
+  <div class="admin-body">
+
+    <!-- Stats + actions -->
+    <section class="admin-panel">
+      <div class="admin-stats" id="admin-stats"></div>
+
+      <div class="admin-actions">
+        <button id="btn-refresh" class="btn-ghost">↻ Refresh</button>
+        <button id="btn-reset" class="btn-warn">Reset All Scores</button>
+        <button id="btn-delete-all" class="btn-danger">Delete All Teams</button>
+      </div>
+      <div id="admin-msg" class="admin-msg hidden"></div>
+    </section>
+
+    <!-- Teams table -->
+    <section class="admin-teams">
+      <div class="admin-teams-header">
+        <h2>Teams</h2>
+        <span id="admin-team-count" class="lb-count-dark">0 teams</span>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Team</th>
+              <th>Score</th>
+              <th>Progress</th>
+              <th>Set Breakdown</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="admin-tbody"></tbody>
+        </table>
+        <div id="admin-empty" class="admin-empty hidden">No teams have registered yet.</div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<!-- ── CONFIRM MODAL ───────────────────────────────────────────────────────── -->
+<div id="confirm-overlay" class="result-overlay hidden">
+  <div class="result-card confirm-card">
+    <div class="confirm-icon" id="confirm-icon">⚠️</div>
+    <h2 id="confirm-title"></h2>
+    <p id="confirm-text" class="confirm-text"></p>
+    <div class="confirm-buttons">
+      <button id="confirm-cancel" class="btn-ghost">Cancel</button>
+      <button id="confirm-ok" class="btn-danger">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script src="admin.js"></script>
+</body>
+</html>
