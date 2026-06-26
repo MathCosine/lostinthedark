@@ -40,14 +40,18 @@ document.getElementById('login-form').addEventListener('submit', async e => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ teamName, password }),
     });
-    const data = await res.json();
+    let data;
+    try { data = await res.json(); } catch (_) { data = {}; }
     if (!res.ok) {
-      errEl.textContent = data.error || 'Login failed.';
+      errEl.textContent = data.error || `Server error (${res.status}). Is the server running?`;
       errEl.classList.remove('hidden');
       return;
     }
     session = { teamName, password, currentSet: data.currentSet, totalScore: data.totalScore, scores: data.scores };
     enterCompetition();
+  } catch (err) {
+    errEl.textContent = 'Could not reach the server. Make sure it is running.';
+    errEl.classList.remove('hidden');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Enter Competition';
@@ -158,10 +162,10 @@ async function submitSet() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ teamName: session.teamName, password: session.password, answers }),
     });
-    const data = await res.json();
-
+    let data;
+    try { data = await res.json(); } catch (_) { data = {}; }
     if (!res.ok) {
-      errEl.textContent = data.error || 'Submission failed.';
+      errEl.textContent = data.error || `Server error (${res.status}).`;
       errEl.classList.remove('hidden');
       return;
     }
@@ -170,8 +174,11 @@ async function submitSet() {
     session.currentSet++;
     updateHeaderScore();
     renderPips();
-    fetchLeaderboard(); // immediate refresh after submit
+    fetchLeaderboard();
     showResult(data);
+  } catch (err) {
+    errEl.textContent = 'Could not reach the server.';
+    errEl.classList.remove('hidden');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Submit Set';
