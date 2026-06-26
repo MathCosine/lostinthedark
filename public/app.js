@@ -193,7 +193,9 @@ function showResult(data) {
   const correct = data.results.filter(r => r.correct).length;
 
   document.getElementById('result-icon').textContent =
-    correct === 4 ? '🎉' : correct === 0 ? '😔' : '✅';
+    correct === 4 ? '✦' : correct === 0 ? '—' : '✓';
+  document.getElementById('result-icon').className =
+    'result-icon ' + (correct === 4 ? 'r-perfect' : correct === 0 ? 'r-none' : 'r-some');
   document.getElementById('result-title').textContent =
     correct === 4 ? 'Perfect Set!' : `${correct} / 4 Correct`;
 
@@ -242,14 +244,14 @@ function renderLeaderboard() {
   count.textContent = `${leaderboardData.length} team${leaderboardData.length !== 1 ? 's' : ''}`;
 
   if (leaderboardData.length === 0) {
-    list.innerHTML = '<div style="padding:1rem;text-align:center;color:#94a3b8;font-size:.85rem">No teams yet</div>';
+    list.innerHTML = '<div style="padding:1.25rem;text-align:center;color:var(--ink-3);font-size:.82rem">No teams yet</div>';
     return;
   }
 
   list.innerHTML = leaderboardData.map((team, i) => {
     const rank    = i + 1;
     const rankCls = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
-    const rankStr = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+    const rankStr = rank;
     const isMe    = session && team.name === session.teamName;
     const done    = Math.min(team.currentSet - 1, 8);
 

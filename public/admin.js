@@ -103,7 +103,8 @@ function render() {
 
   tbody.innerHTML = teams.map((t, i) => {
     const rank    = i + 1;
-    const medal   = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+    const rankCls = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+    const medal   = rank;
     const done    = Math.min(t.currentSet - 1, 8);
     const bars    = Array.from({ length: 8 }, (_, si) => {
       const cls = si < done ? 'done' : (si === done && !t.finished ? 'active' : '');
@@ -115,7 +116,7 @@ function render() {
 
     return `
       <tr>
-        <td class="rank-cell">${medal}</td>
+        <td class="rank-cell ${rankCls}">${medal}</td>
         <td class="name-cell">${escHtml(t.name)}</td>
         <td class="score-cell">${t.totalScore}</td>
         <td class="progress-cell">
