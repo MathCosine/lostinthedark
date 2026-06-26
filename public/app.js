@@ -1,0 +1,287 @@
+/* ── State ───────────────────────────────────────────────────────────────── */
+let session = null;  // { teamName, password, currentSet, totalScore, scores }
+let sets = [];       // from /api/sets
+let leaderboardData = [];
+
+const socket = io();
+
+/* ── Boot ────────────────────────────────────────────────────────────────── */
+(async () => {
+  const res = await fetch('/api/sets');
+  sets = await res.json();
+  renderPips();
+})();
+
+/* ── Screens ─────────────────────────────────────────────────────────────── */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+/* ── Login ───────────────────────────────────────────────────────────────── */
+document.getElementById('login-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const teamName = document.getElementById('team-name').value.trim();
+  const password = document.getElementById('password').value;
+  const errEl    = document.getElementById('login-error');
+
+  if (!teamName || !password) {
+    errEl.textContent = 'Please enter both a team name and password.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  errEl.classList.add('hidden');
+
+  const btn = e.target.querySelector('button');
+  btn.disabled = true;
+  btn.textContent = 'Logging in…';
+
+  try {
+    const res  = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teamName, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      errEl.textContent = data.error || 'Login failed.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    session = { teamName, password, currentSet: data.currentSet, totalScore: data.totalScore, scores: data.scores };
+    enterCompetition();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Enter Competition';
+  }
+});
+
+/* ── Competition ─────────────────────────────────────────────────────────── */
+function enterCompetition() {
+  showScreen('comp-screen');
+  document.getElementById('hdr-team').textContent = session.teamName;
+  updateHeaderScore();
+  renderPips();
+
+  if (session.currentSet >= sets.length) {
+    showFinished();
+  } else {
+    renderSet(session.currentSet);
+  }
+}
+
+function updateHeaderScore() {
+  document.getElementById('hdr-score').textContent = session.totalScore;
+}
+
+/* ── Progress pips ───────────────────────────────────────────────────────── */
+function renderPips() {
+  const container = document.getElementById('set-progress');
+  if (!container || !sets.length) return;
+  const pips = sets.map((_, i) => {
+    const cls = i < (session?.currentSet ?? 0) ? 'done' : i === (session?.currentSet ?? 0) ? 'active' : '';
+    return `<div class="pip ${cls}"></div>`;
+  }).join('');
+  container.innerHTML = `<div class="pips">${pips}</div>`;
+}
+
+/* ── Render set ──────────────────────────────────────────────────────────── */
+function renderSet(idx) {
+  const set = sets[idx];
+  if (!set) return;
+
+  // Banner
+  document.getElementById('set-num').textContent = `Set ${set.number}`;
+  document.getElementById('set-meta').textContent =
+    `  ·  ${set.points} pts each  ·  ${set.level}`;
+  renderPips();
+
+  // Problems
+  const list = document.getElementById('problems-list');
+  list.innerHTML = set.problems.map((p, i) => `
+    <div class="problem-card">
+      <div class="prob-num">${i + 1}</div>
+      <div class="prob-text">${p}</div>
+    </div>
+  `).join('');
+  renderMath(list);
+
+  // Answer inputs
+  const grid = document.getElementById('answer-grid');
+  grid.innerHTML = [1, 2, 3, 4].map(n => `
+    <div class="answer-field">
+      <label>Problem ${n}</label>
+      <input type="text" id="ans-${n}" placeholder="Answer ${n}" autocomplete="off" />
+    </div>
+  `).join('');
+
+  // Focus first input
+  setTimeout(() => document.getElementById('ans-1')?.focus(), 50);
+
+  document.getElementById('answer-section').querySelector('h3')?.remove();
+  document.getElementById('submit-error').classList.add('hidden');
+  document.getElementById('result-overlay').classList.add('hidden');
+  document.getElementById('finished-overlay').classList.add('hidden');
+}
+
+/* ── Submit ──────────────────────────────────────────────────────────────── */
+document.getElementById('submit-btn').addEventListener('click', submitSet);
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.activeElement?.id?.startsWith('ans-')) {
+    const n = parseInt(document.activeElement.id.split('-')[1]);
+    const next = document.getElementById(`ans-${n + 1}`);
+    if (next) { next.focus(); }
+    else { submitSet(); }
+  }
+});
+
+async function submitSet() {
+  const answers = [1, 2, 3, 4].map(n => (document.getElementById(`ans-${n}`)?.value ?? '').trim());
+  const errEl   = document.getElementById('submit-error');
+  errEl.classList.add('hidden');
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Grading…';
+
+  try {
+    const res  = await fetch('/api/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teamName: session.teamName, password: session.password, answers }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      errEl.textContent = data.error || 'Submission failed.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    session.totalScore = data.totalScore;
+    session.currentSet++;
+    updateHeaderScore();
+    renderPips();
+    showResult(data);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Submit Set';
+  }
+}
+
+/* ── Result overlay ──────────────────────────────────────────────────────── */
+function showResult(data) {
+  const set = sets[session.currentSet - 1];
+  const correct = data.results.filter(r => r.correct).length;
+  const maxPts  = set.points * 4;
+
+  document.getElementById('result-icon').textContent =
+    correct === 4 ? '🎉' : correct === 0 ? '😔' : '✅';
+  document.getElementById('result-title').textContent =
+    correct === 4 ? 'Perfect Set!' : `${correct} / 4 Correct`;
+
+  // Color answer inputs
+  data.results.forEach((r, i) => {
+    const inp = document.getElementById(`ans-${i + 1}`);
+    if (inp) { inp.classList.add(r.correct ? 'correct' : 'wrong'); inp.disabled = true; }
+  });
+
+  // Breakdown
+  document.getElementById('result-breakdown').innerHTML = data.results.map((r, i) => `
+    <div class="rb-item ${r.correct ? 'correct' : 'wrong'}">
+      <div class="rb-label">Problem ${i + 1}</div>
+      <div class="rb-ans">${r.correct ? '✓' : '✗ ' + escHtml(r.expected)}</div>
+    </div>
+  `).join('');
+
+  document.getElementById('result-earned').textContent =
+    `+${data.earned} pts  ·  Total: ${data.totalScore}`;
+
+  const nextBtn = document.getElementById('result-next');
+  if (data.done) {
+    nextBtn.textContent = 'View Final Results';
+    nextBtn.onclick = showFinished;
+  } else {
+    nextBtn.textContent = `Continue to Set ${session.currentSet + 1} →`;
+    nextBtn.onclick = () => {
+      document.getElementById('result-overlay').classList.add('hidden');
+      renderSet(session.currentSet);
+    };
+  }
+
+  document.getElementById('result-overlay').classList.remove('hidden');
+}
+
+function showFinished() {
+  document.getElementById('result-overlay').classList.add('hidden');
+  document.getElementById('finished-score').textContent = session.totalScore;
+  document.getElementById('finished-overlay').classList.remove('hidden');
+}
+
+/* ── Leaderboard ─────────────────────────────────────────────────────────── */
+socket.on('leaderboard', data => {
+  leaderboardData = data;
+  renderLeaderboard();
+});
+
+function renderLeaderboard() {
+  const list = document.getElementById('lb-list');
+  const count = document.getElementById('lb-count');
+  if (!list) return;
+
+  count.textContent = `${leaderboardData.length} team${leaderboardData.length !== 1 ? 's' : ''}`;
+
+  if (leaderboardData.length === 0) {
+    list.innerHTML = '<div style="padding:1rem;text-align:center;color:#94a3b8;font-size:.85rem">No teams yet</div>';
+    return;
+  }
+
+  list.innerHTML = leaderboardData.map((team, i) => {
+    const rank     = i + 1;
+    const rankCls  = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+    const rankStr  = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+    const isMe     = session && team.name === session.teamName;
+    const setsDone = Math.min(team.currentSet - 1, 8);
+
+    const bars = Array.from({ length: 8 }, (_, si) => {
+      const cls = si < setsDone ? 'done' : si === setsDone && !team.finished ? 'active' : '';
+      return `<div class="lb-bar ${cls}"></div>`;
+    }).join('');
+
+    return `
+      <div class="lb-row${isMe ? ' me' : ''}">
+        <div class="lb-rank ${rankCls}">${rankStr}</div>
+        <div class="lb-info">
+          <div class="lb-name">${escHtml(team.name)}${isMe ? ' ★' : ''}</div>
+          <div class="lb-set-bars">${bars}</div>
+          <div class="lb-set">${team.finished ? 'Finished' : `On Set ${team.currentSet}`}</div>
+        </div>
+        <div class="lb-score">${team.totalScore}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+/* ── KaTeX rendering ─────────────────────────────────────────────────────── */
+function renderMath(el) {
+  renderMathInElement(el, {
+    delimiters: [
+      { left: '$$', right: '$$', display: true },
+      { left: '$',  right: '$',  display: false },
+      { left: '\\(', right: '\\)', display: false },
+      { left: '\\[', right: '\\]', display: true },
+    ],
+    throwOnError: false,
+  });
+}
+
+/* ── Util ────────────────────────────────────────────────────────────────── */
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}

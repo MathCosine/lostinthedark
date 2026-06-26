@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SFMA Guts Round</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ── LOGIN ──────────────────────────────────────────────────────────────── -->
+<div id="login-screen" class="screen active">
+  <div class="login-card">
+    <div class="login-header">
+      <div class="login-badge">SFMA</div>
+      <h1>Guts Round</h1>
+      <p class="login-sub">San Francisco Math Academy · 2025–2026</p>
+    </div>
+    <form id="login-form">
+      <label for="team-name">Team Name</label>
+      <input id="team-name" type="text" placeholder="e.g. Team Euler" autocomplete="off" />
+
+      <label for="password">Password</label>
+      <input id="password" type="password" placeholder="Enter your team password" />
+
+      <div id="login-error" class="error-msg hidden"></div>
+      <button type="submit" class="btn-primary">Enter Competition</button>
+    </form>
+    <p class="login-hint">New team? Entering a new name + password will register your team.</p>
+  </div>
+</div>
+
+<!-- ── COMPETITION ─────────────────────────────────────────────────────────── -->
+<div id="comp-screen" class="screen">
+
+  <!-- Header -->
+  <header class="comp-header">
+    <div class="header-left">
+      <span class="header-logo">SFMA</span>
+      <span class="header-title">Guts Round</span>
+    </div>
+    <div class="header-center">
+      <span id="hdr-team" class="hdr-team"></span>
+    </div>
+    <div class="header-right">
+      <span class="score-label">Score</span>
+      <span id="hdr-score" class="hdr-score">0</span>
+      <span class="score-max">/ 352</span>
+    </div>
+  </header>
+
+  <div class="comp-body">
+
+    <!-- Main problem area -->
+    <main class="problem-area" id="problem-area">
+
+      <!-- Set banner -->
+      <div class="set-banner" id="set-banner">
+        <div class="set-banner-left">
+          <span class="set-num" id="set-num">Set 1</span>
+          <span class="set-meta" id="set-meta"></span>
+        </div>
+        <div class="set-progress" id="set-progress"></div>
+      </div>
+
+      <!-- Problems -->
+      <div class="problems-list" id="problems-list"></div>
+
+      <!-- Answer row -->
+      <div class="answer-section" id="answer-section">
+        <div class="answer-grid" id="answer-grid"></div>
+        <div id="submit-error" class="error-msg hidden"></div>
+        <button id="submit-btn" class="btn-primary btn-submit">Submit Set</button>
+      </div>
+
+      <!-- Result overlay -->
+      <div id="result-overlay" class="result-overlay hidden">
+        <div class="result-card">
+          <div class="result-icon" id="result-icon"></div>
+          <h2 id="result-title"></h2>
+          <div id="result-breakdown" class="result-breakdown"></div>
+          <div class="result-score">
+            <span id="result-earned"></span>
+          </div>
+          <button id="result-next" class="btn-primary">Continue to Next Set →</button>
+        </div>
+      </div>
+
+      <!-- Finished screen -->
+      <div id="finished-overlay" class="result-overlay hidden">
+        <div class="result-card finished-card">
+          <div class="finished-trophy">🏆</div>
+          <h2>Competition Complete!</h2>
+          <p class="finished-sub">You've finished all 8 sets.</p>
+          <div class="finished-score">
+            Final Score: <strong id="finished-score"></strong> / 352
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Leaderboard sidebar -->
+    <aside class="leaderboard" id="leaderboard">
+      <div class="lb-header">
+        <span class="lb-title">Live Leaderboard</span>
+        <span class="lb-dot"></span>
+        <span id="lb-count" class="lb-count">0 teams</span>
+      </div>
+      <div id="lb-list" class="lb-list"></div>
+    </aside>
+
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
